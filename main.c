@@ -116,46 +116,53 @@ void parse(char *fileName, char *base, char *ex)
 
 int main(int argc, char **argv)
 {
-	FILE *fp = fopen("disk.img", "rb");
-	char baseName[9], exName[5];
-	parse(argv[1], baseName, exName);
-	if (fp != NULL)
+	if (argc == 2)
 	{
-		Fat12_message message;
-		fread(&message, sizeof(message), 1, fp);
-		Root_table *rootTables = (Root_table *) malloc(sizeof(Root_table) * message.header.rootCnt);
-		if (rootTables != NULL)
+		FILE *fp = fopen("disk.img", "rb");
+		char baseName[9], exName[5];
+		parse(argv[1], baseName, exName);
+		if (fp != NULL)
 		{
-			fread(rootTables, sizeof(rootTables), message.header.rootCnt, fp);
-			for (int i = 0; i < message.header.rootCnt; i++)
+			Fat12_message message;
+			fread(&message, sizeof(message), 1, fp);
+			Root_table *rootTables = (Root_table *) malloc(sizeof(Root_table) * message.header.rootCnt);
+			if (rootTables != NULL)
 			{
-				if (cmpStr(rootTables[i].baseFileName, baseName) && cmpStr(rootTables[i].exFileName, exName))
+				fread(rootTables, sizeof(rootTables), message.header.rootCnt, fp);
+				for (int i = 0; i < message.header.rootCnt; i++)
 				{
-					int clus = rootTables[i].clus;
-					while (clus != 0xFF0 && clus != 0xFFF)
+					if (cmpStr(rootTables[i].baseFileName, baseName) && cmpStr(rootTables[i].exFileName, exName))
 					{
-						char *buffer = (char *) calloc(sizeof(char), message.header.secPerClus * 512);
-						fseek(fp, 33 * 512, SEEK_SET);
-						fseek(fp, (clus - 2) * message.header.secPerClus * 512, SEEK_CUR);
-						fread(buffer, message.header.secPerClus * 512, 1, fp);
-						puts(buffer);
-						free(buffer);
-						clus = getClus(&message.fatTables[0].data[clus / 2].data[clus % 2], clus % 2);
+						int clus = rootTables[i].clus;
+						while (clus != 0xFF0 && clus != 0xFFF)
+						{
+							char *buffer = (char *) calloc(sizeof(char), message.header.secPerClus * 512);
+							fseek(fp, 33 * 512, SEEK_SET);
+							fseek(fp, (clus - 2) * message.header.secPerClus * 512, SEEK_CUR);
+							fread(buffer, message.header.secPerClus * 512, 1, fp);
+							puts(buffer);
+							free(buffer);
+							clus = getClus(&message.fatTables[0].data[clus / 2].data[clus % 2], clus % 2);
+						}
+						break;
 					}
-					break;
 				}
+				free(rootTables);
 			}
-			free(rootTables);
+			else
+			{
+				perror("Cannot alloc memory");
+			}
+			fclose(fp);
 		}
 		else
 		{
-			perror("Cannot alloc memory");
+			perror("Cannot open file disk.img");
 		}
-		fclose(fp);
 	}
 	else
 	{
-		perror("Cannot open file disk.img");
+		fprintf(stderr, "Argument wrong!\n");
 	}
 	return 0;
 }
